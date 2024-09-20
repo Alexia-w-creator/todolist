@@ -57,7 +57,7 @@
               {{ todo.task }}
             </div>
             <div 
-              class="column mt-2 ml-6"
+              class="column mt-2"
               :class="{'has-text-success line-through':
               todo.done}"
             >
