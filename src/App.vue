@@ -1,144 +1,252 @@
 <template>
-  <div id="app">
-    <ToDoList />
+  <div class="todolist">
+
+    <div class="title has-text-centered">
+      Todo list
+    </div>
+
+    <form
+      @submit.prevent="addTodo"
+    >
+
+      <div class="field is-grouped mb-5">
+        <p class="control is-expanded">
+          <input 
+            v-model="newTask.task"
+            class="input" 
+            type="text" 
+            placeholder="Add task"
+          >
+          <!-- {{ newTask.task }} -->
+        </p>
+        <p class="control is-expanded">
+          <input 
+            v-model="newTask.date"
+            class="input" 
+            type="date"
+          >
+          <!-- {{ newTask.date }} -->
+        </p>
+        <p class="control">
+          <button 
+            :disabled="!newTask.task"
+            class="button is-info"
+          >
+            Add
+          </button>
+        </p>
+      </div>
+    </form>
+
+
+
+    <div 
+      v-for="todo in todos"
+      class="card mb-5"
+      :class="{'has-background-success-light': todo.done}"
+    >
+      <div class="card-content">
+        <div class="content">
+
+          <div class="columns is-mobile">
+            <div 
+              class="column mt-2"
+              :class="{'has-text-success line-through':
+              todo.done}"
+            >
+              {{ todo.task }}
+            </div>
+            <div 
+              class="column mt-2 ml-6"
+              :class="{'has-text-success line-through':
+              todo.done}"
+            >
+              {{ todo.date }}
+            </div>
+            <div class="column is-5 has-text-right">
+              <button 
+                @click="toggleDone(todo.id)"
+                class="button"
+                :class="todo.done ? 'is-success':
+                'is-light'"
+              >
+                &check;
+              </button>
+              <button 
+                @click="deleteTodo(todo.id)"
+                class="button is-danger ml-2"
+              >
+                &cross;
+              </button>
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
+  
 </template>
 
-<script>
-import ToDoList from './components/ToDoList.vue';
+
+<script setup>
+import {ref, onMounted} from 'vue';
+import { db } from '@/firebase';
+import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { Timestamp } from "@firebase/firestore";
 
 
-export default {
-  name: 'App',
-  components: {
-    ToDoList
-  },
-  data: ()=>({}),
+const todosCollectionRef = collection(db, "todos");
+
+const todos = ref([
+  // {
+  //   id:'id1',
+  //   task:'Walk',
+  //   date:'2023-05-06',
+  //   done: false
+  // },
+  // {
+  //   id:'id2',
+  //   task:'Eat',
+  //   date:'2023-05-16',
+  //   done: false
+  // }
+])
+
+onMounted(async()=>{
+
+  onSnapshot(collection(db, "todos"), (querySnapshot) => {
+    const fbTodos = [];
+    querySnapshot.forEach((doc) => {
+      let jsDate = timestampToDate(doc.data().date);
+
+      const todo = {
+        id: doc.id,
+        task: doc.data().task,
+        date: jsDate,
+        done: doc.data().done
+      }
+      fbTodos.push(todo)
+      sortTasks(fbTodos);
+      });
+      todos.value = fbTodos;
+  });
+})
+
+const newTask = ref({
+  task:'',
+  date:''
+})
+const addTodo = ()=>{
+  let jsDate = MygetTime(newTask._rawValue.date);
+  console.log(newTask._rawValue.date)
+  addDoc(collection(db, "todos"), {
+    task: newTask._rawValue.task,
+    date: jsDate,
+    done: false
+  });
+
+  // if(newTask._rawValue.date =='')
+  // {
+  //   newTask._rawValue.date = getTodayDate();
+  // }
+
+  // const newTodo = {
+  //   id:'',
+  //   task:newTask._rawValue.task,
+  //   date:newTask._rawValue.date,
+  //   done: false
+  // }
+  // todos.value.unshift(newTodo);
+  newTask.value = {
+    task:'',
+    date:''
+  }
+
+}
+function MygetTime(date){
+  let jsDate;
+  if(date == ''){
+    jsDate = new Date(getTodayDate());
+  }
+  else {jsDate = new Date(date);}
+  const created = Timestamp.fromDate(jsDate);
+  console.log(created);
+  return (created)
+}
+
+
+
+function getTodayDate(){
+  let curDate = new Date();
+    let year, month, day;
+    year = curDate.getFullYear();
+    month = String(curDate.getMonth()+1).padStart(2, '0');
+    day=String(curDate.getDate()).padStart(2, '0');
+    curDate = year + '-' +month+'-'+day;
+  return curDate;
+}
+
+function timestampToDate(date){
+  let jsDate = new Date(date.seconds * 1000 + date.nanoseconds / 1000000);
+  // console.log(jsDate);
+  let year, month, day;
+  year = jsDate.getFullYear();
+  month = String(jsDate.getMonth()+1).padStart(2, '0');
+  day=String(jsDate.getDate()).padStart(2, '0');
+
+  jsDate = year + '-' +month+'-'+day;
+  
+  return jsDate;
+}
+function sortTasks(fbTodos) {
+  return fbTodos.sort((a, b) => {
+      return new Date(a.date) - new Date(b.date);
+  });
+}
+
+
+
+const deleteTodo = id =>{
+  deleteDoc(doc(todosCollectionRef, id));
+}
+
+const toggleDone = id =>{
+  const index = todos.value.findIndex(todo=>todo.id===id);
+  
+  updateDoc(doc(todosCollectionRef, id), {
+    done: !todos.value[index].done
+  });
 }
 </script>
 
-
 <style>
+@import url('/node_modules/bulma/css/bulma.min.css');
+
 #app {
-    font-family: Montserrat, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-align: left;
-    color: #2c3e50;
+  font-family: FreeMono, monospace;
+  text-align: left;
+  color: #2c3e50;
 
 }
 body{
-  background: url(
-    https://i.artfile.me/wallpaper/06-05-2023/1600x900/anime-mo-dao-zu-shi-vej-usyan-lan-vanczi-1646928.jpg
-        );
+  background: url(assets/background.jpg);
+}
 
-}
-#todolist
-{
-  height: 25%;
-  width: 37%;
-  position: relative;
-  left: 110px; /* или right: -20px; */
-}
-#title {
+.title{
   font-family: Brush Script MT, Brush Script Std, cursive;
   font-size: 3em;
   text-align: center;
-}
-input[type="text"]
-{
-    height: 4vh;
-    width: 17vw;
-    margin-right: 10px;
-    border-radius: 5px;
-    font-family: FreeMono, monospace;
-}
-input[type="date"]
-{
-    height: 4vh;
-    /* width: 15vw; */
-    margin-right: 10px;
-    border-radius: 5px;
-    font-family: FreeMono, monospace;
-}
-.btn {
-    background-color: rgb(129, 176, 223);
-    color: white;
-    height: 4vh;
-    width: 7vw;
-    border: none;
-    border-radius: 5px;
-    font-weight: bolder;
-    margin-bottom: 5px;
-    cursor: pointer;
-    font-size: .9rem;
+
 }
 
-
-#list
-{
-  /* height: 100%; */
-  width: 60%;
-  /* text-align: left; */
+.todolist{
+max-width: 550px;
+padding: 20px;
+/* width: 90%; */
+margin: 0;
 }
-.tasks__item__toggle--completed{
+.line-through{
   text-decoration: line-through;
 }
-#task_n
-{
-  position: relative;
-  left: 40px;
-  top: -19px;
-}
-#task_d
-{
-  position: relative;
-  left: 250px;
-  top: -39px;
-}
-input[type = "checkbox"]
-{
-    width: 20px;
-    height: 20px;
-    cursor: pointer !important;
-
-    position: relative;
-    top: 3.5px; /* или bottom: -10px; */
-}
-.d-btn {
-    background-color: rgb(198, 68, 68);
-    color: white; 
-    width: 27.2px;
-    height: 27.2px;
-    border: none;
-    border-radius: 5px;
-    font-weight: bolder;
-    margin-bottom: 5px;
-    cursor: pointer;
-    font-size: .9rem;
-    position: relative;
-    left: 405px;
-    top: -65.5px;
-}
-
-
-.sort{
-    display: grid;
-    grid-template-columns: 75% 25%;
-    margin: 1% 30% 0 28.5%;
-}
-
-li ul li div{
-    list-style-type: none;
-    display: grid;
-    grid-template-columns: 5% 75% 20%;
-    /* font-family: FreeMono, monospace; */
-}
-
-ul{
-    /* margin: 5% 15% 0 15%; */
-    list-style-type: none;
-    font-family: FreeMono, monospace;
-}
-
 </style>
